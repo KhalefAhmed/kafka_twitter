@@ -85,8 +85,8 @@ public class ElasticSearchConsumer {
             ConsumerRecords<String,String> records = consumer.poll(Duration.ofMillis(100));
 
             for (ConsumerRecord<String,String> record:records ){
-               // String id = record.topic() +"_"+ record.partition() +"_"+ record.offset();
-                String id = extractIdFromTweet(record.value());
+               String id = record.topic() +"_"+ record.partition() +"_"+ record.offset();
+                //String id = extractIdFromTweet(record.value());
 
                 IndexRequest indexRequest = new IndexRequest("twitter","tweets",id)
                         .source(record.value(), XContentType.JSON);
@@ -108,8 +108,10 @@ public class ElasticSearchConsumer {
     }
 
     private static JsonParser jsonParser;
-    private static String extractIdFromTweet(String tweet){
-        return jsonParser.parse(tweet)
+
+    private static String extractIdFromTweet(String tweetJson){
+        // gson library
+        return jsonParser.parse(tweetJson)
                 .getAsJsonObject()
                 .get("id_str")
                 .getAsString();
