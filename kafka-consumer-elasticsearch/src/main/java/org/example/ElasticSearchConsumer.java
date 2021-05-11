@@ -1,5 +1,6 @@
 package org.example;
 
+import com.google.gson.JsonParser;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -84,20 +85,15 @@ public class ElasticSearchConsumer {
             ConsumerRecords<String,String> records = consumer.poll(Duration.ofMillis(100));
 
             for (ConsumerRecord<String,String> record:records ){
-                logger.info("Topic: " + record.topic() + " \n" +
-                        "Key: " + record.key() + " \n" +
-                        "Value: " + record.value() + " \n" +
-                        "Partition: " + record.partition() + " \n" +
-                        "Offset: " + record.offset() + " \n" +
-                        "Timestamp: " + record.timestamp());
+               // String id = record.topic() +"_"+ record.partition() +"_"+ record.offset();
+                String id = extractIdFromTweet(record.value());
 
-                IndexRequest indexRequest = new IndexRequest("twitter","tweets")
+                IndexRequest indexRequest = new IndexRequest("twitter","tweets",id)
                         .source(record.value(), XContentType.JSON);
 
                 IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                String id = indexResponse.getId();
-                logger.info(id);
 
+                logger.info(indexResponse.getId());
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
@@ -109,5 +105,13 @@ public class ElasticSearchConsumer {
         //close the client gracefully
         //client.close();
 
+    }
+
+    private static JsonParser jsonParser;
+    private static String extractIdFromTweet(String tweet){
+        return jsonParser.parse(tweet)
+                .getAsJsonObject()
+                .get("id_str")
+                .getAsString();
     }
 }
