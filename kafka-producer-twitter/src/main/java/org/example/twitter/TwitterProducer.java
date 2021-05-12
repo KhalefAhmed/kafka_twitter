@@ -88,7 +88,7 @@ public class TwitterProducer {
         /** Declare the host you want to connect to, the endpoint, and authentication (basic auth or oauth) */
         Hosts hosebirdHosts = new HttpHosts(Constants.STREAM_HOST);
         StatusesFilterEndpoint hosebirdEndpoint = new StatusesFilterEndpoint();
-        List<String> terms = Lists.newArrayList("kafka");
+        List<String> terms = Lists.newArrayList("kafka","bitcoin","java");
         hosebirdEndpoint.trackTerms(terms);
 
         // These secrets should be read from a config file
