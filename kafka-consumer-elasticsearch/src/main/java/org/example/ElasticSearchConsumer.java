@@ -92,14 +92,16 @@ public class ElasticSearchConsumer {
 
             BulkRequest bulkRequest = new BulkRequest();
             for (ConsumerRecord<String,String> record:records ){
-
-               //String id = record.topic() +"_"+ record.partition() +"_"+ record.offset();
-                String id = extractIdFromTweet(record.value());
-                IndexRequest indexRequest =
-                        new IndexRequest("twitter","tweets",id// to make our consumer idempotent
-                        ).source(record.value(), XContentType.JSON);
-
-                bulkRequest.add(indexRequest); // we add to our bulk request (takes no time)
+                try {
+                    //String id = record.topic() +"_"+ record.partition() +"_"+ record.offset();
+                    String id = extractIdFromTweet(record.value());
+                    IndexRequest indexRequest =
+                             new IndexRequest("twitter", "tweets", id// to make our consumer idempotent
+                                      ).source(record.value(), XContentType.JSON);
+                    bulkRequest.add(indexRequest); // we add to our bulk request (takes no time)
+                }catch (NullPointerException e){
+                    logger.warn("skipping bad data "+ record.value());
+                }
             }
 
             if (recordCount > 0) {
