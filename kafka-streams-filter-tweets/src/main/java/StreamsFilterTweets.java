@@ -32,6 +32,7 @@ public class StreamsFilterTweets {
         //build topology
         KafkaStreams kafkaStreams = new KafkaStreams(streamsBuilder.build(), properties);
         //start our stream application
+        kafkaStreams.start();
     }
 
     private static JsonParser jsonParser;
