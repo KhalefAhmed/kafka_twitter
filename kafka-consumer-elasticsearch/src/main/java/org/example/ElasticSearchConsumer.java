@@ -15,7 +15,6 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
@@ -31,10 +30,22 @@ import java.util.Properties;
 
 public class ElasticSearchConsumer {
 
+    private static JsonParser jsonParser;
+
+    private static String extractIdFromTweet(String tweetJson){
+        // gson library
+        return jsonParser.parse(tweetJson)
+                .getAsJsonObject()
+                .get("id_str")
+                .getAsString();
+    }
+
     public static RestHighLevelClient createClient() {
-        String hostname = "kafka-twitter-9889276251.us-east-1.bonsaisearch.net";
-        String username = "hqxjbk1pzf";
-        String password = "adatr609o1";
+        // replace with your own credentials
+        String hostname = ""; // localhost or bonsai url
+        String username = ""; // needed only for bonsai
+        String password = ""; // needed only for bonsai
+
 
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
         credentialsProvider.setCredentials(AuthScope.ANY,
@@ -78,37 +89,47 @@ public class ElasticSearchConsumer {
     }
 
     public static void main(String[] args) throws IOException {
-
-        Logger logger = LoggerFactory.getLogger(ElasticSearchConsumer.class);
-
+        Logger logger = LoggerFactory.getLogger(ElasticSearchConsumer.class.getName());
         RestHighLevelClient client = createClient();
 
-        KafkaConsumer<String,String> consumer = createConsumer("twitter_tweets");
+        KafkaConsumer<String, String> consumer = createConsumer("twitter_tweets");
 
-        while (true){
-            ConsumerRecords<String,String> records = consumer.poll(Duration.ofMillis(100));
+        while(true){
+            ConsumerRecords<String, String> records =
+                    consumer.poll(Duration.ofMillis(100)); // new in Kafka 2.0.0
+
             Integer recordCount = records.count();
-            logger.info("Received "+ recordCount + " records");
+            logger.info("Received " + recordCount + " records");
 
             BulkRequest bulkRequest = new BulkRequest();
-            for (ConsumerRecord<String,String> record:records ){
+
+            for (ConsumerRecord<String, String> record : records){
+
+                // 2 strategies
+                // kafka generic ID
+                // String id = record.topic() + "_" + record.partition() + "_" + record.offset();
+
+                // twitter feed specific id
                 try {
-                    //String id = record.topic() +"_"+ record.partition() +"_"+ record.offset();
                     String id = extractIdFromTweet(record.value());
-                    IndexRequest indexRequest =
-                             new IndexRequest("twitter", "tweets", id// to make our consumer idempotent
-                                      ).source(record.value(), XContentType.JSON);
+
+                    // where we insert data into ElasticSearch
+                    IndexRequest indexRequest = new IndexRequest("tweets")
+                            .source(record.value(), XContentType.JSON)
+                            .id(id); // this is to make our consumer idempotent
+
                     bulkRequest.add(indexRequest); // we add to our bulk request (takes no time)
-                }catch (NullPointerException e){
-                    logger.warn("skipping bad data "+ record.value());
+                } catch (NullPointerException e){
+                    logger.warn("skipping bad data: " + record.value());
                 }
+
             }
 
             if (recordCount > 0) {
-                BulkResponse bulkResponse = client.bulk(bulkRequest, RequestOptions.DEFAULT);
-                logger.info("committing offsets ...");
+                BulkResponse bulkItemResponses = client.bulk(bulkRequest, RequestOptions.DEFAULT);
+                logger.info("Committing offsets...");
                 consumer.commitSync();
-                logger.info("offsets have been committed");
+                logger.info("Offsets have been committed");
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
@@ -117,18 +138,9 @@ public class ElasticSearchConsumer {
             }
         }
 
-        //close the client gracefully
-        //client.close();
+        // close the client gracefully
+        // client.close();
 
     }
 
-    private static JsonParser jsonParser;
-
-    private static String extractIdFromTweet(String tweetJson){
-        // gson library
-        return jsonParser.parse(tweetJson)
-                .getAsJsonObject()
-                .get("id_str")
-                .getAsString();
-    }
 }
